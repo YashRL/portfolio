@@ -1,0 +1,480 @@
+Content-Extraction-Engine-for-RAG-Pipelines
+Content-Retrieval-AI-Multi-Modal-RAG
+
+this 2 are actually same parts same project now what is the stroy behind this so this project was initially developed by European Patient Organisation the reason was they have countless documents so they wanted to develop an AI which have such a flexible insertion and retrival system that they can insert as many documents they want ad retrive the information with very high accuracy and it was successfull latter we developed this sam eproject for another project where it was suppose to insert any kind of documents from books to an article or youtube vedio on internet shared through a link
+
+Enterprise-Grade Document Intelligence & Retrieval Platform for Agentic RAG Systems
+Designed an enterprise-grade document intelligence platform that ingests any content type, deduplicates it at semantic granularity, and enables high-precision, agent-driven retrieval for modern RAG and reasoning systems.
+
+Design Philosophy (One Sentence)
+Separate content identity from document identity, and deduplicate at paragraph-level while keeping documents immutable.
+
+now the description below maybe outdated so lets update it first
+so in insertion the backedn fucntionality will always receive the document to insert in pdf now different of documents like 
+- youtube vedio or audio or any vedio will be summaries by ASR technologies we will receive there transcribtions
+- images wuill be converted into pdf
+- smae for text adn any other document like text, docs file etc any kind of docuemnt
+
+then comes the content extraction part which alwasy receives a pdf file
+now it works on different levels the user can enable or disbale any functionality in this
+- Normal: The pdf will be extracted through python pdf libraries like pdfplumber which basically extracts the text from the pdf and split it into chunks
+- Modern Books: if the pdf is modern book or a document with TOCs table of contnet the content will be extraxcted in hierarchical way like extracts its titles and sections paragraphs etc else it will go to Normal/Legacy mode
+- OCR: I have also utilised the Teseract OCR for very old book which does not have embedded text but instead images in the pdf contnet also used to extract the text inside pdf so no information could miss
+- Image Recognition: now if the uszers content is image or picture then modelrn vision supported llms models like openai's, google gemini or anthropic or Meta new models can be used this will also help if there are pictures in the documents like diagrams, graphs, or some images etc again no information should be missed
+end the end it generates a JSON format file which can be ingesed through our built in vector embedding system or can be used manually or different types of usecases
+
+now the ingestion strategy is also not very normal here initially we used the overlapping each cheunk may have 20% content of previous chunk this make a link with the syetm as well but ther eare several problems in this becasue the system starts to priorities the large documenst more and may ignore the tiny documents
+so we remove the overalpping completely and used knowledge graphs and keywords with 
+Multi-version documents
+Hierarchical structure (document → sections → headings → paragraphs)
+Chunk-level embeddings
+Multi-layer deduplication
+Canonicalization across versions
+Uniform treatment of any document type or length
+
+now we also had one more problem which was depuplication if the same document will be ingested with different what we will do in that case the requirement here was to find a solution which allows use to ingest that document without denial cretae a new entry for that document name but we cant ingest it again unless there are new changes so only those new changes will be ingest which will be linked very cleverlay
+
+like example A.pdf, B.pdf have same content so A will be ingest and for B only a new entry will be creted but the chunk id of A will be assigned to B instead of creating new entry
+and lets say there is new document whch is extension or update of A lets say A_2.0.pdf then only the new chunk will be smartly ingested and will be linked smartly with existing data 
+our goals was to not and never desturb the existing users data the existing user data will eb alwys untouched and protected
+
+
+so this is how we solved that problem
+Below is a clean, conceptual summary of the schema, focused exactly on what you asked:
+core deduplication techniques
+how chunks + versions are linked
+why documents of any length/type are treated equally
+how re-ingestion with updates works without touching existing user data
+I’ll explain it as a system design, not table-by-table noise.
+1. Core Idea of the Schema (One Sentence)
+This schema separates “content identity” from “document identity” and performs deduplication at multiple semantic layers (file → text → chunk → meaning), while keeping versioning and user data mmutable.
+That is the key philosophy.
+2. Deduplication Is Multi-Layered (Not Single Hash)
+This system does progressive deduplication, from cheapest → most expensive:
+Layer 1: File-level dedup
+Purpose: Detect exact same file
+documents.file_hash
+Same binary → same file
+Fast rejection / linking
+Used when:
+A.pdf is uploaded again unchanged
+Layer 2: Text-level dedup
+Purpose: Same content, different file formats
+documents.text_hash
+Normalized extracted text
+Catches:
+A.pdf vs A.docx
+OCR vs digital text
+This is why document type and length don’t matter.
+Layer 3: Near-duplicate detection
+Purpose: Same content with small differences
+minhash_sig → Jaccard similarity
+simhash → Hamming distance
+semantic_hash → embedding-based meaning
+This allows:
+reordered sections
+formatting changes
+minor edits
+Layer 4: Chunk-level dedup (MOST IMPORTANT)
+Purpose: Fine-grained reuse of content
+paragraphs.chunk_hash
+norm_text
+optional semantic similarity
+This is where the magic happens.
+3. Why All Documents Are Treated Equally (Length / Type / Format)
+Because nothing depends on “document size” or “file type”.
+What the system actually cares about:
+Paragraphs (chunks)
+Normalized text
+Hashes + embeddings
+A 2-page PDF and a 500-page book both become:
+Document
+ └── Sections
+      └── Paragraphs (atomic unit)
+           ├── chunk_hash
+           ├── embedding
+           └── semantic identity
+
+That’s why:
+PDFs
+DOCX
+HTML
+transcripts
+scraped pages
+→ all behave the same.
+4. How A.pdf and B.pdf Share Content (Your Example)
+scenario
+A.pdf and B.pdf have identical content
+What happens
+A.pdf ingestion
+New documents row
+Paragraphs created
+Each paragraph gets:
+chunk_hash
+embedding
+Stored normally
+B.pdf ingestion
+New documents row (important!)
+BUT during chunking:
+chunk_hash already exists globally
+Paragraph rows are not duplicated
+
+Instead:
+Paragraphs reference same content
+dedup_cluster_id or same chunk_hash
+
+✅ Result:
+Two documents
+One set of chunks
+Zero duplication
+Full traceability
+This is why chunk_hash is NOT globally unique anymore — it is document-scoped but globally indexable.
+5. How A_2.0.pdf Is Handled (Incremental Updates)
+cenario
+A_2.0.pdf = A.pdf + new sections
+What happens
+A_2.0 creates:
+New documents entry
+version_of = A.id
+canonical_doc_id = A.id
+Chunk comparison:
+Old chunks → already exist → reused
+New chunks → inserted fresh
+Mixed documents fully supported
+Paragraph linkage:
+Old chunks → same chunk_hash
+New chunks → new rows
+
+✅ Result:
+Only deltas are ingested
+No recomputation
+No user data touched
+6. Why Existing User Data Is NEVER Disturbed
+This is intentional and very well-designed.
+
+Key guarantees:
+1. Documents are immutable
+New versions → new rows
+Old documents are never overwritten
+2. Paragraphs are append-only
+No destructive updates
+No re-indexing of old content
+3. Embeddings are stable
+Each paragraph has exactly one embedding
+Reused everywhere
+4. User references remain valid
+Chats
+Assessments
+Retrieval results
+→ always point to stable IDs
+This is enterprise-grade data safety.
+
+7. Why This Schema Is “Clever” (Architecturally)
+It combines:
+Version control (Git-like)
+Content-addressable storage
+Semantic deduplication
+Zero-copy reuse
+Audit-safe immutability
+Most systems do one of these.
+This does all.
+
+8. Mental Model (Best Way to Remember)
+
+Think like this:
+Documents are labels.
+Paragraphs are truth.
+Hashes decide identity.
+Versions are pointers.
+
+9. One-Line Summary for Docs / Design Review
+“The schema uses multi-level hashing and semantic similarity to deduplicate content at paragraph granularity, enabling version-aware, immutable ingestion where new documents reuse existing chunks and only deltas are stored—ensuring zero data disruption and uniform handling across all document types and sizes.”
+
+now this system was manily used in rag systems for modern AI solutions specially the new Agentic AI and Reasoning Agents
+so I also built an advanced retrival system
+which have this many filters 
+
+async def advanced_hybrid_search(
+    query: str,  
+    # Filter options
+    book: str = "",
+    book_id: str = "",
+    section: str = "",
+    section_id: str = "",
+    keywords: str = "",
+    uploader_email: str = "",
+    uploader_id: str = "",
+    created_after: str = "",
+    created_before: str = "",
+    min_tokens: int = None,
+    max_tokens: int = None,
+    
+    # Scoring options
+    weight_profile: str = "balanced",  # balanced, semantic, lexical, precise
+    semantic_weight: float = None,
+    lexical_weight: float = None,
+    keyword_weight: float = None,
+    context_weight: float = None,
+    
+    # Advanced options
+    search_type: str = "hybrid",
+    candidate_pool: int = 200,
+    enable_context_boost: bool = True,
+    dedup_strategy: str = "hash",
+    limit: int = 10
+) -> dict:
+    """
+    🔍 Perform advanced hybrid search combining semantic, lexical, and keyword matching.
+    """
+now my core phylosophy behind this search was first letting Agent decide what exactly it needs
+and second was "Why do one search type when I can combine them all and blow the roof off?"
+
+so the Agent uses this search function with as many parameter with the information available such that Agent gets the information with very very good precision
+so this mainly come handy when we have abstract idea of the knowledge we want like a we know topic but dont remeber page no, chapter no or book or writter at that time more information means more parameters measn more chance to find what we want 
+
+also I read and R&D on this things
+
+MINT: Multi-Vector Search Index Tuning
+https://arxiv.org/abs/2504.20018 
+Given a dataset where each item (row) has multiple vector features (e.g. each column might have its own embedding), MINT helps figure out which vector indexes to build (on which columns, or combinations of columns) so that queries run fast but storage and recall remain good.
+
+In nutshell instead of embedding entire row in a single embedding you make seprate embedding for columns and MINT is a query-workload–aware index tuner for multi-vector search.
+Basically it will increase the signals on every embedding in result it will increase the accuracy and speed both.
+
+Nearest Neighbours
+like ANN, HNSW, DiskANN, PQ compression
+Think of simple or basic semantic search system on pgvector db built witha layer of ANN (Approximate Neareast Neighbour) search with IVFFlat.
+Know in ANN you don’t search the entire dataset row by row (which would be exact nearest neighbor search and very slow on billions).
+Instead, ANN narrows down the search to a smaller candidate pool (say the closest 100–200 vectors) by using clever data structures (clusters, graphs, partitions).
+Then it compares only within that smaller pool to return the best matches.
+ANN (like HNSW, IVFFlat) speed depends on how many vectors and dimensions it sees.
+
+
+
+Partitioning / Sharding
+Split the table into smaller chunks by date, category, or some logic.
+Limits search to relevant chunks so billions of rows become manageable.
+
+Partition/Sharding  + BM25 Ranking
+The idea is like user wants to search top 10 we will search accross 3 partiions for 30 results and then from thos 30 results rank top 10 using BM25.
+
+
+---
+title: "Content Extraction Engine for RAG Pipelines"
+publishedAt: "2024-05-05"
+summary: "A scalable document parsing engine that converts complex, unstructured documents into clean hierarchical chunks for high-quality RAG systems."
+images:
+  - "/images/yash/Content-Extraction-Engine-for-RAG-Pipelines/System_design.png"
+  - "/images/yash/Content-Extraction-Engine-for-RAG-Pipelines/Content-Extraction-Engine-for-RAG-Pipelines.png"
+team:
+  - name: "Yash Rawal"
+    role: "LLM / NLP Engineer"
+    avatar: "/images/avatar.jpg"
+---
+
+# Enterprise Document Intelligence Engine for RAG
+
+## Overview
+
+Most enterprise knowledge lives inside long, unstructured documents like PDFs, reports, manuals, and research papers. While these documents are rich in information, they are poorly suited for modern AI systems unless they are carefully structured.
+
+The Content Extractor Engine was built to bridge this gap. It transforms raw, complex documents into clean, hierarchical, and metadata-rich content partitions that are ready for vector databases and Retrieval-Augmented Generation (RAG) workflows. By preserving document structure—headings, sections, and paragraphs—the engine significantly improves downstream search accuracy and AI response quality.
+
+---
+
+## Key Features
+
+- **Multi-Format Document Ingestion**  
+  Supports PDFs and other document types, handling both simple and complex layouts.
+
+- **TOC-Aware Structural Extraction**  
+  Leverages Table of Contents (TOC) to accurately identify document hierarchy and section boundaries.
+
+- **Intelligent Content Segmentation**  
+  Breaks documents into logical units such as sections, subsections, and paragraphs instead of arbitrary text chunks.
+
+- **Hierarchical Metadata Enrichment**  
+  Generates rich metadata for each partition (section title, hierarchy level, document context), improving retrieval precision.
+
+- **Dynamic Partitioning for RAG**  
+  Produces clean, semantically meaningful chunks optimized for vector database ingestion.
+
+- **Extensible Parsing Architecture**  
+  Designed to integrate advanced document parsing tools like GROBID or Mineru for extracting abstracts, bibliographies, and other specialized sections.
+
+---
+
+## Technologies Used
+
+- **Python** – Core document processing and orchestration  
+- **LangChain** – Pipeline orchestration and RAG compatibility  
+- **Custom Embeddings** – Optimized for domain-specific semantic search  
+- **PDF Processing Libraries** – Including `pdfplumber` and related tools  
+- **Vector Databases** – Downstream ingestion for semantic search and retrieval  
+
+---
+
+## Challenges and Learnings
+
+One of the key challenges was handling the variability of real-world documents. PDFs often differ widely in formatting, structure, and quality, making consistent extraction difficult.
+
+Another challenge was maintaining logical coherence while chunking content. Naive chunking strategies often break context, leading to poor retrieval results. This project required careful balancing between chunk size, semantic completeness, and hierarchical alignment.
+
+Through this work, I gained deeper insights into how **document structure directly impacts AI retrieval quality**, and why thoughtful preprocessing is just as critical as the model itself in RAG systems.
+
+---
+
+## Outcome
+
+- Transformed unstructured documents into **clean, hierarchical content partitions**
+- Improved **search and retrieval accuracy** in downstream RAG pipelines
+- Enabled scalable ingestion of large document collections
+- Reduced noise and hallucinations in AI-powered question-answering systems
+
+This engine became a foundational layer for building reliable, enterprise-grade knowledge systems.
+
+---
+
+## Potential Client Use Cases
+
+- **Enterprise Knowledge Bases**  
+  Convert internal PDFs, policies, and manuals into searchable AI-driven knowledge systems.
+
+- **Legal & Compliance Teams**  
+  Structure contracts, regulations, and case documents for precise semantic search.
+
+- **Research & Academia**  
+  Organize research papers into structured sections for faster literature review and analysis.
+
+- **AI SaaS Products**  
+  Power RAG pipelines with higher-quality document chunks for better LLM responses.
+
+- **Consulting & Advisory Firms**  
+  Enable rapid information retrieval across large document repositories.
+
+---
+
+## Why This Project Stands Out
+
+This project highlights the ability to:
+
+- Design **RAG-first document pipelines**
+- Handle **real-world, messy data**
+- Improve AI systems through **better data engineering**
+- Build scalable preprocessing layers that directly enhance LLM performance
+
+
+
+---
+title: "Content Retrieval AI – Multi-Modal RAG System"
+publishedAt: "2024-06-18"
+summary: "A unified retrieval system enabling semantic search across documents, slides, images, and URLs."
+images:
+  - "/images/yash/Content-Retrieval-AI-Multi-Modal-RAG/System_design.png"
+  - "/public/images/yash/Content-Retrieval-AI-Multi-Modal-RAG/Content-Retrieval-AI-Multi-Modal-RAG.png"
+team:
+  - name: "Yash Rawal"
+    role: "RAG Systems Engineer"
+    avatar: "/images/avatar.jpg"
+---
+
+# Unified Enterprise Knowledge Search AI
+
+## Overview
+
+Modern teams store knowledge everywhere — documents, slide decks, PDFs, images, and online resources. Finding the right information often means searching across multiple tools, formats, and folders. This project was built to eliminate that fragmentation by creating a **Content Retrieval AI** that unifies all content into a single, intelligent search experience.
+
+The system allows users to upload or link any type of content and then retrieve precise, context-aware answers using semantic search and AI-driven summarization. By transforming unstructured data into searchable knowledge, the platform enables teams to reliably find, reuse, and build on existing information.
+
+---
+
+## Key Features
+
+- **Unified Content Ingestion**  
+  Supports documents, slides, PDFs, images, and URLs, bringing all knowledge sources into a single system.
+
+- **OCR & Text Extraction Pipeline**  
+  Extracts text from scanned documents and images, making previously unsearchable content accessible.
+
+- **Intelligent Content Chunking**  
+  Breaks large documents into meaningful sections to improve retrieval accuracy and relevance.
+
+- **High-Precision Semantic Search**  
+  Uses embeddings to find contextually relevant information rather than relying on keyword matching.
+
+- **Multiple Search Modes**  
+  - *Semantic search* across the entire knowledge base  
+  - *Section or heading-based search* for targeted retrieval  
+  - *Document-level (book-level) search* for querying complete files or grouped content
+
+- **AI-Powered Answers & Summaries**  
+  Retrieved content is passed to an LLM to generate concise answers or summaries tailored to the user’s query.
+
+- **Multi-Modal Support**  
+  Handles text, scanned images, and web-based content through a unified retrieval pipeline.
+
+---
+
+## Technologies Used
+
+- **Python** – Core ingestion, processing, and retrieval logic  
+- **LangChain** – Retrieval pipelines and LLM orchestration  
+- **Custom Embeddings** – Optimized for domain-specific precision  
+- **Vector Databases (PGVector, MongoDB)** – Scalable, high-performance similarity search  
+- **Docker** – Containerized deployment for consistency and scalability  
+- **OCR Pipelines** – Text extraction from images and scanned documents  
+
+---
+
+## Challenges and Learnings
+
+A key challenge was maintaining **high retrieval precision** across diverse content formats and sizes. Different sources required different chunking strategies to preserve context without sacrificing performance.
+
+Another challenge was designing a retrieval flow that could support multiple query styles — from broad semantic searches to highly targeted section-level queries — while keeping response times low.
+
+This project highlighted the importance of **embedding quality, chunking strategy, and ranking logic** in building reliable retrieval-augmented AI systems.
+
+---
+
+## Outcome
+
+- Enabled **unified search across documents, slides, PDFs, images, and URLs**  
+- Improved knowledge reuse by making hidden or siloed content easily discoverable  
+- Delivered accurate, context-aware results instead of noisy keyword matches  
+- Established a scalable foundation for retrieval-augmented generation (RAG) systems  
+
+---
+
+## Potential Client Use Cases
+
+- **Enterprise Knowledge Bases**  
+  Centralize internal documents and enable employees to find answers instantly.
+
+- **Research & Legal Teams**  
+  Search across large collections of PDFs, reports, and scanned documents with high accuracy.
+
+- **Product & Engineering Teams**  
+  Retrieve information from design docs, technical specs, and past decisions without manual digging.
+
+- **Customer Support Platforms**  
+  Power AI-driven support agents using internal manuals, FAQs, and external documentation.
+
+- **Content & Media Organizations**  
+  Index and search large archives of articles, presentations, and visual assets.
+
+---
+
+## Why This Project Stands Out
+
+This project demonstrates the ability to:
+
+- Build **multi-modal RAG systems**
+- Design scalable, production-ready retrieval architectures
+- Optimize for **precision, relevance, and performance**
+- Turn unstructured content into actionable organizational knowledge
+
+What we achived:
+Now this System is being used by many Advanced AI Agents the reason is instead of just attaching the document or information we let Agent Decide when it need information which info and how much this improved the context given to the llm and also reduced tokens cost and increased the effeciency and the example I shared that A/B and A_2.0 is actually owrking really well and the systme can search with very high precision like chapter, sectiosn page nos or even small headings or paragraphs even when there are 1000+ books with documents from 1 page to 500+ page large books youtube vedios transcribtions or web articles of some event or news all are covered well
+
+Possible Future Improvements:
+now what i wanted to add and updated in this project i wanted to support of csv and excels sheets and tabular data more properly for that i have some thoughts like tabular data can be seprated from current ingestion pipleine and will bge treated different\ly even within the system
