@@ -1,0 +1,6 @@
+This project is like tavaly or serp api the specail APIs desdigned to give LLM model and agent to have ability to search on internet
+so its core fucntionality is to provide LLM model information in the JSON format 
+it can search on internet for websites, aritcles, images and vedios have differrnet kind of filters modes like 
+general, text, news etc
+you can give it the url it will crawl through that url and extract all the information from that page or url and retrun in format which is specially articaulated for the LLM
+its llm first API
