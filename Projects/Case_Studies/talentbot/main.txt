@@ -1,9 +1,0 @@
-Now next is maybe mixture of so many projects actually
-
-So this project name is Talentbot it was developed for Organisation Named TalenTeam
-
-the Core features are this is not any ordinary chatbot it can check users learning, work, tracks and goals, it if you are a manager it can tell you what your team is doing this days there work, tasks, learnings, tracks and goals and achievements in form of tables and Visulisations through graphs and charts it also have capability to search on intenrte crawl websites or read the given document also the same "Enterprise-Grade Document Intelligence & Retrieval Platform for Agentic RAG Systems" used in this application too so it has a very huge knwoeldge base in this case which was build through users who uses this applucation and it also has this feature which was like manager can generate assessment can save and can also copy the link of that assessment and send to any employee or guest they can solve and submit this thing is been used in multiple ways to asses or test an interns, give employees assesments for policy compliance, learn ,self sudy and check or test your skills or learn new skills it have so much capabilities to perform
-
-
-now its a huge project and main or most important conmpnenet is MCP(Model Context Protocol)
-so this is how this project was build initially i build an agent using MCP for building an AI which have access to a Huge Database through an API this apis can give me data of any employee and activities or thing related to that employee
